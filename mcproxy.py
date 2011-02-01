@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 
 # [part of] a very special minecraft beta bot
 # leif.theden@gmail.com
