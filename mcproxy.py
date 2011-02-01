@@ -8,7 +8,8 @@
 from twisted.internet.protocol import Protocol, Factory, ClientFactory
 from twisted.internet import reactor
 
-from bravo.packets import packets, packets_by_name, make_packet, parse_packets
+from bravo.packets import packets_by_name, make_packet, parse_packets
+from bravo.packets import packets as packet_def
 
 from mcshell import ProxyShell
 
@@ -38,36 +39,27 @@ def info(text):
 def error(text):
     print text
 
-# use name from bravo's "packets_by_name"
-ignore = ["chunk", "ping", "flying", "create", "entity-position", "time"]
-
 # reverse the packets by name dict
 packets_by_id = dict([(v, k) for (k, v) in packets_by_name.iteritems()])
 
-# set our ignored packets
-ignore = [ packets_by_name[x] for x in ignore ]
 
-
-class ProxyPlugin(object):
+class Plugin(object):
     """
-    Plugins have a super simple interface and are designed to be used
-    in an interactive shell from within the game.
+    This is the interface for plugins
+
+    The simple interface allows them to be managed by a shell.
     """
 
-    def __init__(self, c):
+    def __init__(self):
         self._enabled = False
-        self.connection = c
-        try:
-            [ setattr(self, v, None) for v in self.variables ]
-        except:
-            pass
+        self.parent = None
 
     def set(self, name, value):
         name = name.strip("-")
         try:
             getattr(self, name)
         except AttributeError:
-            return "Cannot set %s.  Variable doesn't exist.\n"
+            return "Cannot set %s.  Variable doesn't exist.\n" % name
         else:
             setattr(self, name, value)
 
@@ -76,74 +68,125 @@ class ProxyPlugin(object):
         try:
             return str(getattr(self, name))
         except AttributeError:
-            return "Cannot get %s.  Variable doesn't exist.\n"
+            return "Cannot get %s.  Variable doesn't exist.\n" % name
 
     def enable(self):
-        self._enabled = True
+        if self.parent == None:
+            print "cannot enable %s.  parent is not set (this is a bug)." % self.__class__
+        else:
+            self._enabled = True
+
+        # hook for when plugin is enabled
+        if hasattr(self, "OnEnable"):
+            self.OnEnable()
 
     def disable(self):
         self._endabled = False
 
-    def write(self, data):
-        if self._enabled:
-            return self.filter(data)
 
-    def packet(self, header, payload):
-        """
-        Expects a header and payload from a packet.
-        Do not send raw data.
-        Return the packet the packet you want to be sent.
+class ProxyPlugin(Plugin):
+    """
+    These plugins are meant to be added to the proxy.
 
-        Make SURE to return the payload even if you dont actually change it.
-        """
-        raise NotImplementedError
+    They should offer at least one StreamPlugin for
+    incoming or outgoing data.
+
+    incoming = from the server
+    outgoing = from the client
+
+    """
+
+    incoming_filter = None
+    outgoing_filter = None 
+
+
+class StreamFilter(Plugin):
+    """
+    Stream plugins operate on raw data.
+    """
 
     def filter(self, data):
         """
         Data is direct from the socket if the plugin is enabled.
         Return the data you want to be sent instead.
 
+        Honor self._enabled
+
         Make SURE to return data even if you dont actually change it.
         """
         raise NotImplementedError
 
-class ShellPlugin(ProxyPlugin):
-    """
-    Default plugin to allow use of a shell
-    """
-    variables = ['escape_key']
 
-    def __init__(self, c, stdout, key):
-        super(ShellPlugin, self).__init__(c)
+class PacketFilter(Plugin):
+    """
+    PacketPlugins operate with parsed packets.
+
+    Packets should follow conventions in the bravo library
+
+    Instances wanting to recive packets must register themselves
+    in order to get data.  This cuts down on header checks.
+    """
+
+    def filter(self, header, payload):
+        """
+        Expects a header and payload from a packet.
+        Return the packet the packet you want to be sent (if any).
+        Do not send raw data.
+
+        Make SURE to return the payload even if you dont actually change it.
+        """
+        raise NotImplementedError
+
+class ShellPlugin(PacketFilter):
+    """
+    Plugin to allow use of a shell.
+    """
+
+    def __init__(self, stdout, key):
+        super(ShellPlugin, self).__init__()
         self.chat_header = packets_by_name["chat"]
         self.escape_key = key
         self.shell = ProxyShell(self, stdout)
 
-    def packet(self, header, payload):
+    def OnEnable(self):
+        self.parent.register(self, packets_by_name["chat"])
+
+    def filter(self, header, payload):
         if self._enabled:
-            if header == self.chat_header:
-                if payload.message[0] == self.escape_key:
-                    # our shell cannot handle unicode...just convert it to plain ascii
-                    msg = str(payload.message[1:])
-                    self.shell.onecmd(msg)
+            if payload.message[0] == self.escape_key:
+                # chat messages from minecraft's servers are unicode
+                # our shell (cmd.py) cannot handle unicode
+                # just convert it to plain ascii and remove the escape char
+                self.shell.onecmd(str(payload.message[1:]))
+                return None
 
-class PacketParser(ProxyPlugin):
+        return header, payload
+
+class PacketParser(StreamFilter):
     """
-    Filters packets based on the bravo library's definations.
-    Plugins can be added to this plugin.
-
-    Plugins added must have a "packet" function
-
-    Does not filter packets, yet.
+    Filters packets based on the bravo library's definitions.
+    Packet Filters need to be added to this plugin.
     """
 
-    def __init__(self, c):
-        super(PacketParser, self).__init__(c)
+    def __init__(self):
+        super(PacketParser, self).__init__()
         self.plugins = []
         self.buffer = ""
-        self.ignore = []
+        self.interested = {}
 
+    def register(self, plugin, header):
+        try:
+            assert plugin not in self.interested[header]
+        except KeyError:
+            self.interested[header] = []
+            self.interested[header].append(plugin)
+        except AssertionError:
+            return
+        else:    
+            self.interested[header].append(plugin)
+    
     def add_plugin(self, plugin):
+        plugin.parent = self
         self.plugins.append(plugin)
 
     def remove_plugin(self, plugin):
@@ -151,20 +194,48 @@ class PacketParser(ProxyPlugin):
             self.plugins.remove(plugin)
         except ValueError:
             pass
+        else:
+            plugin.parent = None
+
+        for k, v in self.interested.values():
+            try:
+                v.remove(plugin)
+            except ValueError:
+                pass
 
     def filter(self, data):
+        """
+        Filter raw data and sends packets to the plugins attached.
+        If the plugin returns a packet, it is added to the stream.
+        If the plugin returns None, the packet is removed.
+
+        Filters added to this one will need to be registered to get
+        packets
+        """
+
         if self._enabled:
             self.buffer += data
             packets, self.buffer = parse_packets(self.buffer)
 
+            r = ""
+
             for header, payload in packets:
-                [ p.packet(header, payload) for p in self.plugins ]
+                try:
+                    for f in self.interested[header]:
+                        p = f.filter(header, payload)
+                        if p != None:
+                            r += chr(p[0]) + packet_def[p[0]].build(p[1])
 
-        return data
+                except KeyError:
+                    r += chr(header) + packet_def[header].build(payload)
 
-class PacketInspect(ProxyPlugin):
-    def __init__(self, c, h):
-        super(PacketInspect, self).__init__(c)
+            return r
+        else:
+            return data
+
+class PacketInspect(PacketFilter):
+    def __init__(self, h):
+        super(PacketInspect, self).__init__()
         self.stdout = sys.stdout
         self.header = h
         self.buffer = ""
@@ -189,7 +260,7 @@ class PacketInspect(ProxyPlugin):
             return "ok."
 
     # this expects to use minecraft packets, not raw data
-    def packet(self, header, payload):
+    def filter(self, header, payload):
         if self._enabled:
             if header not in self.ignore:
                 write = self.stdout.write
@@ -197,22 +268,27 @@ class PacketInspect(ProxyPlugin):
                 write("========== %s ===========\n" % packets_by_id[header])
                 write(payload)
 
+        return header, payload
+
 # this handle traffic from the client
 class MCClientProtocol(Protocol):
     def dataReceived(self, data):
         if self.remote:
             for p in self.plugins:
-                p.filter(data)
+                data = p.filter(data)
             self.remote.transport.write(data)
 
     def add_plugin(self, plugin):
         self.plugins.append(plugin)
+        plugin.parent = self
 
     def remove_plugin(self, plugin):
         try:
             self.plugins.remove(plugin)
         except ValueError:
             pass
+        else:
+            plugins.parent = None
 
     def connectionMade(self):
         self.plugins = []
@@ -220,14 +296,14 @@ class MCClientProtocol(Protocol):
         self.remote = None
 
         # setup our packet parser plugin
-        parser = PacketParser(self)
-        parser.enable()
+        parser = PacketParser()
         self.add_plugin(parser)
+        parser.enable()
 
         # set up the shell plugin (goes the the packet parser)
-        s = ShellPlugin(self, self.transport, "#")
-        s.enable()
+        s = ShellPlugin(self.transport, "#")
         parser.add_plugin(s)
+        s.enable()
 
         reactor.connectTCP(remote_host, remote_port, RemoteClientProxyFactory(self))
 
@@ -240,8 +316,6 @@ class MCRemoteProtocol(Protocol):
 
     def dataReceived(self, data):
         self.remote.transport.write(data)
-        #for p in self.plugins:
-        #    data = p.filter(data)
 
 class RemoteClientProxyFactory(ClientFactory):
     def __init__(self, caller):
