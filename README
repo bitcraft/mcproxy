@@ -12,5 +12,5 @@ There is a simple interface for writing plugins that
 can be enabled and configured through the shell.
 (not quite yet...)
 
-Requires Twisted and Bravo.
+Requires Twisted, Bravo, and yapsy (included).
 https://github.com/MostAwesomeDude/bravo

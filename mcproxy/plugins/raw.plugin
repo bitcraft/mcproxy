@@ -1,0 +1,9 @@
+[Core]
+Name = Raw
+Module = raw
+
+[Documentation]
+Description = Allows plugins to access data from a socket
+Author = Leif Theden
+Version = 0.1
+Website = github.com/bitcraft/mcproxy

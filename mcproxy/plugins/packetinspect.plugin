@@ -1,0 +1,9 @@
+[Core]
+Name = PacketInspect
+Module = packetinspect
+
+[Documentation]
+Description = Prints packet dumps to the console
+Author = Leif Theden
+Version = 0.1
+Website = github.com/bitcraft/mcproxy

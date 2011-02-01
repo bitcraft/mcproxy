@@ -3,14 +3,13 @@ from textwrap import TextWrapper, dedent
 from cmd import Cmd
 
 from bravo.packets import make_packet
+from plugin import plugin_manager
 
 """
 the shell for the proxy.
-
-
 """
 
-wrap = 20
+wrap = 30
 
 # wrap around stdout
 class ChatWrapper(object):
@@ -27,15 +26,22 @@ class ChatWrapper(object):
             self.stdout.write(make_packet("chat", message=line))
 
 class ProxyShell(Cmd):
-    def __init__(self, proxy, stdout):
+    def __init__(self, stdout=None):
         Cmd.__init__(self)
-        self.proxy = proxy
-        self.stdout = ChatWrapper(stdout)
+        if stdout != None:
+            self.set_stdout(stdout)
+        else:
+            self.stdout = None
+
         self.wrap = wrap
 
-        # a wrapper...not implimented
-        wrapper = TextWrapper(width=self.wrap)
+    def set_stdout(self, stdout):
+        """
+        This must be properly set before using the shell, otherwise the
+        plugin will raise an exception.
+        """
 
+        self.stdout = ChatWrapper(stdout)
 
     def do_add(self, line):
         """
@@ -99,14 +105,16 @@ class ProxyShell(Cmd):
         Usage: list
         """
         def make_status(plugin):
-            if plugin.enabled:
-                return "on"
-            elif not plugin.enabled:
-                return "off"
-            else:
-                return "--"
+            name = plugin.__class__.__name__
 
-        p = [ "%s %s" % (p.__class__, make_status(p)) for p in self.proxy.plugins ]
+            if plugin.enabled == True:
+                return "%s on" % name
+            elif plugin.enabled == False:
+                return "%s off" % name
+            else:
+                return "%s --" % name
+
+        p = [ make_status(p) for p in self.proxy.all_plugins() ]
         self.print_topics("Plugins", p, 15,self.wrap)
 
     def do_quit(self, line):
