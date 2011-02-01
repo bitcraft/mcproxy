@@ -1,0 +1,10 @@
+MCPROXY
+
+Aims to be a simple and extendable proxy for use with
+Minecraft.  Currently, the proxy forwards the data,
+inspects packets, and offers a simple shell usable
+through chat by prefixing chat messages with #.
+
+Right now, all shell commands are forwarded, be warned.
+
+Uses the bravo library for packet imformation.
