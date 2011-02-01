@@ -5,6 +5,12 @@ Minecraft.  Currently, the proxy forwards the data,
 inspects packets, and offers a simple shell usable
 through chat by prefixing chat messages with #.
 
-Right now, all shell commands are forwarded, be warned.
+Commands are not implimented yet (although they show up
+under #help).
 
-Uses the bravo library for packet imformation.
+There is a simple interface for writing plugins that
+can be enabled and configured through the shell.
+(not quite yet...)
+
+Requires Twisted and Bravo.
+https://github.com/MostAwesomeDude/bravo
