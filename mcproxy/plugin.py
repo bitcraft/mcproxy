@@ -4,32 +4,6 @@ from yapsy.IPlugin import IPlugin
 
 from types import StringType, ListType
 
-class PluginManager(PM):
-    def __init__(self, *args, **kwargs):
-        super(PluginManager, self).__init__(*args, **kwargs)
-        self.listeners = {}
-        self.handlers = {}
-
-    def register_type(self, t):
-        self.listeners[t] = []
-
-    def register_listener(self, plugin, t):
-        try:
-            self.listeners[t].append(plugin)
-        except KeyError:
-            print "Cannot set %s to listen for %s.  Data type is not known." % \
-                (plugin, t)
-
-    def publish(self, t, *args, **kwargs):
-        """
-        Send this information to our listeners.
-        """
-        if len(self.listeners[t]) == 0:
-            return args
-
-        return [ p.publish(*args, **kwargs) for p in self.listeners[t] ]
-
-plugin_manager = PluginManager()
 
 
 class Plugin(IPlugin):
@@ -37,40 +11,49 @@ class Plugin(IPlugin):
     This is the interface for plugins
 
     The simple interface allows them to be managed by a shell.
-    """
 
-    protected_variables = ["parent"]
+    set/get
+    set and get public variables
+
+    cmd_XXX
+    allow commands to be invoked from the shell
+
+    """
 
     def __init__(self):
         self.is_activated = False
 
     def set(self, name, value):
-        name = name.strip("-")
-
-        if name == "enabled":
-            return "Please use the function enable or disable."
-
-        if name in self.protected_variables:
-            return "Cannot change this value"
-
-        try:
-            getattr(self, name)
-        except AttributeError:
-            return "Cannot set %s.  Variable doesn't exist.\n" % name
-        else:
+        if not hasattr(self, "public"):
+            return False
+        elif name in self.public:
             setattr(self, name, value)
+            return True
+        else:
+            return False
 
     def get(self, name):
-        name = name.strip("-")
-        try:
+        if not hasattr(self, "public"):
+            return None
+        elif name in self.public:
             return str(getattr(self, name))
-        except AttributeError:
-            return "Cannot get %s.  Variable doesn't exist.\n" % name
+        else:
+            return None
+
+    def get_variables(self):
+        def getter(v):
+            return getattr(self, v)
+
+        if not hasattr(self, "public"):
+            return None
+        else:
+            d = {}
+            d.update([(x[0], x[1]) for x in zip(self.public, map(getter, self.public)) ])
+            return d
 
     def check_requirements(self):
         if hasattr(self, "required") == False:
             return True
-
 
         missing = []
         not_activated = []
@@ -107,61 +90,68 @@ class Plugin(IPlugin):
  
     def activate(self):
         if self.check_requirements() == False:
+            print "cannotload", self
             return
+
+        if hasattr(self, "public"):
+            if isinstance(self.public, StringType):
+                self.public = [self.public]
+
+            for v in self.public:
+                setattr(self, v, None)
+
+        if hasattr(self, "listen"):
+            if isinstance(self.listen, StringType):
+                self.listen = [self.listen]
+
+            for t in self.listen:
+                plugin_manager.register_listener(self, t)
 
         self.is_activated = True
         if hasattr(self, "OnActivate"):
             self.OnActivate()
 
-class ProxyPlugin(Plugin):
-    """
-    These plugins are meant to be added to the proxy.
-
-    They should offer at least one StreamPlugin for
-    incoming or outgoing data.
-
-    incoming = from the server
-    outgoing = from the client
-
-    """
-
-    incoming_filter = None
-    outgoing_filter = None 
+    def deactivate(self):
+        for t in self.listen:
+            plugin_manager.unregister_listener(self, t)
 
 
-class StreamFilter(Plugin):
-    """
-    Stream plugins operate on raw data.
-    """
+class PluginManager(PM):
+    def __init__(self, *args, **kwargs):
+        kwargs["categories_filter"] = {'Default': Plugin}
+        super(PluginManager, self).__init__(*args, **kwargs)
+        self.listeners = {}
+        self.resources = {}
 
-    def filter(self, data):
+    def register_type(self, t):
+        self.listeners[t] = []
+
+    def register_listener(self, plugin, t):
+        try:
+            self.listeners[t].append(plugin)
+        except KeyError:
+            print "Cannot set %s to listen for %s.  Data type is not known." % \
+                (plugin, t)
+
+    def unregister_listener(self, plugin, t):
+        try:
+            self.listeners[t].remove(plugin)
+        except:
+            pass
+
+    def register_resource(self, name, value):
+        self.resources[name] = value
+
+    def get_resource(self, name):
+        return self.resources[name]
+
+    def publish(self, t, *args, **kwargs):
         """
-        Data is direct from the socket if the plugin is enabled.
-        Return the data you want to be sent instead.
-
-        Honor self.enabled
-
-        Make SURE to return data even if you dont actually change it.
+        Send this information to our listeners.
         """
-        raise NotImplementedError
+        if len(self.listeners[t]) == 0:
+            return args
 
-class PacketFilter(Plugin):
-    """
-    PacketPlugins operate with parsed packets.
+        return [ p.publish(*args, **kwargs) for p in self.listeners[t] ]
 
-    Packets should follow conventions in the bravo library
-
-    Instances wanting to recive packets must register themselves
-    in order to get data.  This cuts down on header checks.
-    """
-
-    def filter(self, header, payload):
-        """
-        Expects a header and payload from a packet.
-        Return the packet the packet you want to be sent (if any).
-        Do not send raw data.
-
-        Make SURE to return the payload even if you dont actually change it.
-        """
-        raise NotImplementedError
-
+plugin_manager = PluginManager()

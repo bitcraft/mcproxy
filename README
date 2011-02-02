@@ -1,16 +1,19 @@
 MCPROXY
 
-Aims to be a simple and extendable proxy for use with
-Minecraft.  Currently, the proxy forwards the data,
-inspects packets, and offers a simple shell usable
-through chat by prefixing chat messages with #.
-
-Commands are not implimented yet (although they show up
+MCPROXY is a simple and extendable proxy for use with
+Minecraft.  The parser uses a simple interface and allows
+configuration in game through chat.
+  
+Many commands are not implemented yet (although they show up
 under #help).
 
-There is a simple interface for writing plugins that
-can be enabled and configured through the shell.
-(not quite yet...)
+Included Plugins:
+	Raw - read data from the socket
+	PacketInspect - print packet debug info
+	PacketParser - parse packets from socket
+	Shell - configure proxy in a console
+	GameShell - configure proxy in game
+	Dig Multiplier - dig faster by spamming dig packets
 
 Requires Twisted, Bravo, and yapsy (included).
 https://github.com/MostAwesomeDude/bravo

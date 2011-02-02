@@ -41,9 +41,13 @@ for p in plugin_manager.getAllPlugins():
 info("Activating plugins...\n")
 
 # activate some plugins by default
+# many plugins have dependancies which are note resolved
+# automatically.  the order they are avtivated in is important!
 plugin_manager.activatePluginByName("Raw")
-plugin_manager.activatePluginByName("PacketParser")
 plugin_manager.activatePluginByName("Shell")
+plugin_manager.activatePluginByName("PacketParser")
+plugin_manager.activatePluginByName("GameShell")
+plugin_manager.activatePluginByName("Dig")
 
 
 info("Waiting for connections...\n")

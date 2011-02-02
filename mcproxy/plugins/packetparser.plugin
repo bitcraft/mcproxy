@@ -3,7 +3,7 @@ Name = PacketParser
 Module = packetparser
 
 [Documentation]
-Description = Uses bravo/construct to parse bytestream.  May be required byt other plugins.
+Description = Uses bravo/construct to parse bytestream.  May be required by other plugins.
 Author = Leif Theden
 Version = 0.1
 Website = github.com/bitcraft/mcproxy

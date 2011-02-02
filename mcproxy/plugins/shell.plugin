@@ -3,7 +3,7 @@ Name = Shell
 Module = shell
 
 [Documentation]
-Description = Gives player access to a shell.  Requires PacketParser plugin.
+Description = Opens a shell on the console.
 Author = Leif Theden
 Version = 0.1
 Website = github.com/bitcraft/mcproxy

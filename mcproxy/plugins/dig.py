@@ -1,14 +1,17 @@
 from mcproxy.plugin import Plugin, plugin_manager
-from bravo.packets import make_packet
+from bravo.packets import packets as packet_def
 
 
 
 class Dig(Plugin):
+    required = "PacketParser"
+    listen   = "packet-digging"
+    public   = "multiplier"
+
     def OnActivate(self):
-        plugin_manager.register_listener(self, "packet-digging")
-        self.multiplier = 1
+        self.multiplier = 20
 
     def publish(self, header, payload):
         if payload.state == 1:
-            d = make_packet(header, payload)
-            return [d] * self.multiplier
+            d = chr(header) + packet_def[header].build(payload)
+            return d * int(self.multiplier)

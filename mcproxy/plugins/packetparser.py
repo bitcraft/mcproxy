@@ -1,24 +1,22 @@
-from mcproxy.plugin import StreamFilter, plugin_manager
 from bravo.packets import packets as packet_def
 from bravo.packets import packets_by_name, make_packet, parse_packets
+from mcproxy.plugin import Plugin, plugin_manager
 
-from types import StringType
+from types import StringType, ListType
 
 # reverse the packets by name dict
 packets_by_id = dict([(v, k) for (k, v) in packets_by_name.iteritems()])
 
-class PacketParser(StreamFilter):
+class PacketParser(Plugin):
     """
     Filters packets based on the bravo library's definitions.
     Packet Filters need to be added to this plugin.
     """
 
     required = "Raw"
+    listen   = "raw"
 
     def OnActivate(self):
-        # we want to listen to raw
-        plugin_manager.register_listener(self, "raw")
-
         # this type will be published with every packet
         plugin_manager.register_type("packet")
 
@@ -44,6 +42,9 @@ class PacketParser(StreamFilter):
                 r += i
             elif i == [None]:
                 continue
+            # assume a list is a list of strings
+            elif isinstance(i, ListType):
+                r += "".join(i)
             else:
                 r += chr(i[0]) + packet_def[i[0]].build(i[1])
 
