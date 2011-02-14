@@ -140,10 +140,19 @@ class PluginManager(PM):
             pass
 
     def register_resource(self, name, value):
-        self.resources[name] = value
+        if isinstance(name, StringType):
+            self.resources[name] = value
+        else:
+            print "Cannot register resource %s: must be a string" % name
+
+    def get_resources(self, *l):
+        return [ self.get_resource(i) for i in l ]
 
     def get_resource(self, name):
-        return self.resources[name]
+        try:
+            return self.resources[name]
+        except KeyError:
+            print "Cannot find resource: %s\n" % name
 
     def publish(self, t, *args, **kwargs):
         """

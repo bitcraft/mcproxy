@@ -46,6 +46,39 @@ class ProxyShell(Cmd):
         else:
             self.stdout = OutputSplitter(self.stdout, output)
 
+    def default(self, line):
+        """
+        When a command is not understood, it goes here.
+        """
+
+        try:
+            l = line.split()
+            plugin, cmd = l[:2]
+        except (ValueError, IndexError):
+            self.syntax_error(line)
+            return
+
+        try:
+            args = l[2:]
+        except IndexError:
+            pass
+        else:
+            args = []
+
+        
+        plugin = plugin_manager.getPluginByName(plugin)
+        plugin = plugin.plugin_object
+        try:
+            f = getattr(plugin, "cmd_" + cmd)
+        except AttributeError:
+            self.stdout.write("*** Plugin \"%s\" has no command: %s\n" % (plugin.name, cmd))
+        else:
+            f(args)
+
+
+    def syntax_error(self, line):
+        self.stdout.write('*** Unknown syntax: %s\n'%line)
+
     def do_add(self, line):
         """
         Add a plugin to the proxy.
@@ -93,6 +126,7 @@ class ProxyShell(Cmd):
             return
 
         plugin.plugin_object.set(name, value)
+        self.stdout.write("ok.")
 
     def do_show(self, line):
         """

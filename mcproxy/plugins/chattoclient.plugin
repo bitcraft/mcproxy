@@ -1,0 +1,9 @@
+[Core]
+Name = ChatToClient
+Module = chattoclient
+
+[Documentation]
+Description = Enables plugins to send messages to the client as chat messages.
+Author = Leif Theden
+Version = 0.1
+Website = github.com/bitcraft/mcproxy

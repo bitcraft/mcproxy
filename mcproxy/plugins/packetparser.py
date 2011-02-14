@@ -36,17 +36,18 @@ class PacketParser(Plugin):
             r = plugin_manager.publish("packet-%s" % packets_by_id[header], header, payload)
             l.append(r)
 
-        r = ""
-        for i in l:
-            if isinstance(i, StringType):
-                r += i
-            elif i == [None]:
-                continue
-            # assume a list is a list of strings
-            elif isinstance(i, ListType):
-                r += "".join(i)
-            else:
-                r += chr(i[0]) + packet_def[i[0]].build(i[1])
+        def breakdown(the_list):
+            data = ""
+            for i in the_list:
+                if isinstance(i, StringType):
+                    data += i
+                elif i == [None]:
+                    continue
+                elif isinstance(i, ListType):
+                    data = breakdown(i)
+                else:
+                    data += chr(i[0]) + packet_def[i[0]].build(i[1])
+            return data
 
-        return r
+        return breakdown(l)
 

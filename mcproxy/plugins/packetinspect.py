@@ -11,35 +11,36 @@ class PacketInspect(Plugin):
     Prints protocol information on the console.
     """
 
-    requires = "PacketParser"
+    requires = ["PacketParser", "chat-to-client"]
 
     def OnActivate(self):
+        self.client_output = plugin_manager.get_resource("chat-to-client")
         self.stdout = sys.stdout
         self.header = " T H I S   I S   A   B U G . "
-        self.ignore = []
+        plugin_manager.register_listener(self, "packet-position")
+        plugin_manager.register_listener(self, "packet-location")
 
     def cmd_listen(self, name):
         try:
             h = packets_by_name[name]
         except KeyError:
-            return "packet %s is not recongized" % name
+            self.client_output.write("packet \"%s\" is not recongized\n" % name) 
         else:
-            plugin_manager.register_listener("packet-%s" % name)
-            return "ok."
+            plugin_manager.register_listener(self, "packet-%s" % name)
+            self.client_output.write("ok.")
 
     def cmd_ignore(self, name):
         try:
             h = packets_by_name[name]
         except KeyError:
-            return "packet %s is not recongized" % name
+            self.client.output.write("packet \"%s\" is not recongized" % name)
         else:
-            plugin_manager.unregister_listener("packet-%s" % name)
-            return "ok."
+            plugin_manager.unregister_listener(self, "packet-%s" % name)
+            self.client_output.write("ok.")
 
     def publish(self, header, payload):
         write = self.stdout.write
-        write("%s\n" % self.header)
         write("========== %s ===========\n" % packets_by_id[header])
-        write(payload)
+        write("%s\n" % str(payload))
         return header, payload
 

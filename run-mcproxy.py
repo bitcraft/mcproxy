@@ -41,14 +41,16 @@ for p in plugin_manager.getAllPlugins():
 info("Activating plugins...\n")
 
 # activate some plugins by default
-# many plugins have dependancies which are note resolved
+# many plugins have dependancies which are not resolved
 # automatically.  the order they are avtivated in is important!
 plugin_manager.activatePluginByName("Raw")
 plugin_manager.activatePluginByName("Shell")
+plugin_manager.activatePluginByName("ChatToClient")
 plugin_manager.activatePluginByName("PacketParser")
 plugin_manager.activatePluginByName("GameShell")
 plugin_manager.activatePluginByName("Dig")
 
+plugin_manager.activatePluginByName("PacketInspect")
 
 info("Waiting for connections...\n")
 reactor.listenTCP(listen_port, ClientProxyFactory((remote_host, remote_port)))
